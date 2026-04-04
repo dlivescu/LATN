@@ -1,0 +1,98 @@
+import os
+import sys
+PROJECT_PATH = os.getcwd()
+SOURCE_PATH = os.path.join(PROJECT_PATH,"src")
+sys.path.append(SOURCE_PATH)
+
+import unittest
+import torch
+import matplotlib
+import matplotlib
+if ((os.name == 'posix') and ('DISPLAY' not in os.environ)):
+    matplotlib.use('Agg')
+import matplotlib.pyplot as plt;
+from src.LDM_TBNN import *
+DEVICE = ("cuda" if torch.cuda.is_available() else "cpu")
+
+
+class test_dataset(unittest.TestCase):
+    def test_load_dataset(self):
+        test_dataset_path = "./test/regression_test_datasets/";
+        datapath = "./data/"
+        load_ds = torch.load(test_dataset_path + "test_dataset.pt", map_location=DEVICE)
+        new_ds,_ = create_ph_datasets(datapath);
+
+        self.assertEqual(load_ds.aij_series.shape, new_ds.aij_series.shape)
+
+        for (key, val) in load_ds.__dict__.items():
+            if ((not '__' in key) and (not callable(val))): # user-defined obj
+                if (torch.is_tensor(load_ds.__getattribute__(key))):
+                    test_tensor = load_ds.__getattribute__(key);
+                    new_tensor = new_ds.__getattribute__(key);
+                    self.assertTrue(torch.equal(test_tensor, new_tensor))
+                else:
+                    test_attr = load_ds.__getattribute__(key);
+                    new_attr = new_ds.__getattribute__(key);
+                    self.assertEqual(test_attr, new_attr);
+                    
+class test_full_model_functionality(unittest.TestCase):
+    def test_load_model(self):
+        model_path = "./data/"
+        ph_model = torch.load(model_path + "tmp_ph_model.pt", map_location=DEVICE)
+        vis_model = torch.load(model_path + "tmp_vis_model.pt", map_location=DEVICE)
+        ds = torch.load(model_path + "ldtn_ph_nl3_nu100_dr0.2_M20_sym.pt", map_location=DEVICE)['test_dataset'];
+        A0 = ds.aij_series;
+        A0 = A0.reshape(A0.shape[0], A0.shape[1], 3,3)
+        N = A0.shape[0]
+        tau = ds.normalization;
+        delta = torch.diag_embed(torch.ones(N,3)) #\delta_{ij}
+        del_1 = torch.einsum('nij,nkl->nijkl', delta, delta);
+        del_2 = torch.einsum('nik,njl->nijkl', delta, delta);
+        del_3 = torch.einsum('nil,njk->nijkl', delta, delta);
+        def forcing(_A):
+            Da = 0.05/tau**2;
+            Ds = 0.05/tau**2;
+            return -(1/3)*torch.sqrt(Ds/5)*del_1 + (1/2)*(torch.sqrt(Ds/5)+torch.sqrt(Da/3))*del_2 + (1/2)*(torch.sqrt(Ds/5)-torch.sqrt(Da/3))*del_3;
+
+        compute_aij_trajs_ldmtbnn(A0, ph_model, vis_model, forcing, 1, tau);
+        return;
+
+class generate_paper_plots(unittest.TestCase):
+    def test_plot_generation(self):
+        model_path = "./data/";
+        ph_model = torch.load(model_path + "ldtn_ph_nl3_nu100_dr0.2_M20_sym.pt", map_location=DEVICE);
+        ph_savepath = model_path + "ph_results/";
+        vis_model = torch.load(model_path + "ldtn_vis_nl5_nu50_dr0.2_M20_sym.pt", map_location=DEVICE);
+        vis_savepath = model_path + "vis_results/";
+        posteriori_savepath = model_path + "/posteriori_results/"
+        ldm_apriori_eval(ph_model, ph_savepath);
+        ldm_apriori_eval(vis_model, vis_savepath);
+
+        self.assertTrue(torch.cuda.is_available(), "\n Cuda is unavailable - posteriori testing will take too long.\n Re-run the tests with a GPU available");
+        if (torch.cuda.is_available()):
+            evolve_trajectories(full_model_path, args.datapath, dns_traj_savepath, start_ind=200, fold_length=200, T=1*3e-3, dt=3e-4, save_every=1);
+
+    def test_eig_alignment_plot(self):
+√        # TODO add TBNN
+        for val in ["ph", "vis"]:
+            fig, axs = plt.subplots(1,3, sharey=True);
+            ldm_align = torch.load(f"./data/{val}_results/eigenvector_alignment.pt", map_location=DEVICE);
+            for i in range(3):
+                axs[i].hist(ldm_align[i,:], density=True, label="LDTN", bins=30, histtype="step")
+                axs[i].set_title(r"e_{i}".format(i=i));
+            fig.supxlabel(r"$\theta$")
+            fig.supylabel(r"PDF")
+            axs[1].legend();
+            plt.savefig(f"./data/{val}_results/{val}_eigenvector_alignment.png")
+
+        # 2d alignment
+        fig, ax = plt.subplots(1,1);
+        ldm_align = torch.load("./data/ph_results/eigenvector_alignment.pt", map_location=DEVICE);
+        ax.hist2d(ldm_align[0,:], ldm_align[-1,:], density=True);
+        ax.set_xlabel(r"$\theta_1$")
+        ax.set_ylabel(r"$\theta_3$")
+        ax.colorbar();
+        plt.savefig(f"./data/ph_results/ph_eigenvector_alignment2d.png")
+            
+if __name__ == '__main__':
+    unittest.main()
