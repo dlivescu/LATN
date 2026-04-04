@@ -1,0 +1,43 @@
+#+FILETAGS: LDM
+
+* today
+
+   
+* inbox
+
+** Cambridge.org/JFMNotebooks
+** fork LDM->interpretting TBNN
+** fix/test plots on HPC
+
+** collect data from JHTDB for range of Re#, >500k samples of (VGT, PH)
+
+** generalization across Re would be main result
+
+** "Complete reproducibility"
+   script with presentation to generate all figures
+
+* on hold
+# *** HOLD Low vs High order invariants in Re240
+#     We imposed $\lambda_{1,2}$, but is the same predictive information present in $\lambda_{3,4,5}$?
+# *** HOLD Need loss plots for high order training
+#     Compare to training for low-order
+# *** HOLD Performance of base model at Re430
+# *** HOLD Low vs High order invariants in Re430
+# *** HOLD Performance of base model at Re610
+# *** HOLD Low vs High order invariants in Re610
+# *** HOLD Does the reduced description fail on the tails of the distribution?
+#     I.e., for low probability draws of the VGT, is the low-order description worse, or is this merely a statment of interpolation vs extrapolation?
+# ** Imposed Latent Space Investigation
+# *** TODO If we choose a different set of invariants, can we improve the performance?
+# *** TODO Pumir check normalization
+# *** TODO Look how statistics change with sample size of high resolution data
+#     Daniel proposes that "coarse" sampling may not be doing a great job of representing the full data.
+
+   
+* scheduled
+
+
+* reference   
+
+
+* completed
