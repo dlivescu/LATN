@@ -1,0 +1,7 @@
+In this work (in progress), we reproduced the current state-of-the-art Lagrangian model to predict the PH, contextualized it with recent phenomenological advancements, and advanced the methodology by introducing and evaluating a new predictive model.
+
+The TBNN is a powerful tool to capture symmetries, while allowing for the flexibility of a NN. We applied this model to homogeneous, isotropic turbulence to close the equations of the non-local pressure Hessian using only the local velocity gradient tensor. We contrasted this approach with a mathematically similar, but philosophically different approach using the RDGF model, motivated by the idea that the recent history of the VGT could better inform the prediction of the current PH.
+
+By combining the two, we created the convTBNN, a first data-driven step towards biasing the statistics of the current PH prediction using the history of the VGT. We showed that we could outperform the local in time TBNN in two metrics, loss value and eigenvector alignment. We began to interpret the weights of the temporal convolution kernel, and related them to the hypotheses made in the phenomenological models (RFD, RDGF).
+
+Further work needs to be done to ensure these results hold under evaluation of richer metrics such as the $Q\text{-}R$ conditional mean tangents, and evaluate the accuracy and stability of the resulting differential equation for the VGT.

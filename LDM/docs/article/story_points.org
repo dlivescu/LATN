@@ -1,0 +1,46 @@
+
+* Step 1: Identify the key story points for your work
+# For each question, write a short paragraph - no more than two or three seentences.
+# These identify the essential story elements
+
+** What is your opening?
+#  This should identify the larger problem to which you are contributing, give readers a sense of the direction your paper is going, and make it clear why it is important. It should engage the widest audience practical.
+
+Simulation of turbulence is vital, yet computationally extraordinally expensive.
+Reduced-order models of turbulence democratize access to accurate estimates of physical quantities.
+Focusing on the computationally efficient Lagrangian frame of reference, we target models of the velocity gradient tensor, a fundamental quantity elucidating many important aspects of turbulence.
+
+# We enrich phenomenological reduced-order models via data-driven closures to the pressure Hessian.
+
+** What is your specific question or hypothesis?
+Current Lagrangian models attempt to close the equations for the pressure Hessian locally in time and space - a task known to be formally intractable, but recent data-driven models have shown impressive performance.
+We weaken this restriction, blending previous work in "deformation models" with data-driven methods, by allowing historical information to inform future predictions.
+Can inclusion of this additional information allow for a better Lagrangian reduced-order model, and if so, how much history is important?
+
+** What are the key results of your work?
+# Identify these in a short list. There should be no more than two to three points
+1. Inclusion of historical evolution of the velocity gradient tensor /does/ improve future prediction.
+2. The length of "important" history is much longer than expected.
+
+** What is your main conclusion? What did you learn about nature?
+# This should use the results from section 3 to answer the question from 2, and should address the larger problem identified in 1
+The history of the Lagrangian velocity gradient tensor is thought to be "forgotten" quickly through strong turbulent fluctuations.
+Our results suggest that a much longer history than previously thought is exploitable to create  accurate reduced Lagrangian models for the velocity gradient tensor.
+
+
+* Step 2: Write the article
+# Write a short article describing your research. Your target audience is scientists who are not specialists in your discipline. You are trying to tell the story of your work and engage and educate your readers, not write a techincal paper.
+# The tone can range between somewhat technical and more casual, but it must be something that technical readers would find interesting. Use your answers from step 1 to frame the story you write in this part of the exercise.
+# The word limit is strict: 800-850 words.
+
+
+
+* Step 3: Analyze your writing
+# Ask and answer the following questions
+1. What did the author do well?
+2. Was the topic interesting? Was it cast at the right level and hit the right audience? Could you have rewritten it to engage a wider audience? Did it make you want to read the rest of the piece?
+3. Was the specific question clear?
+4. Were the results clear? Did they relate to the topic and the specific question?
+5. Were the Conclusions true /conclusions/, or were they merely a restatement of the results? Did they relate to the large issues raised in the opening? Did they answer the specific question asked? Did they clearly grow from the results presented in the piece?
+6. What did you  get as the "take-home" message of the story? Do you believe that this was the message the author was trying to give you?
+7. Was the writing clear? If not, can you figure out why and identify ways to make it clearer?

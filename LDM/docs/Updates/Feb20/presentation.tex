@@ -1,0 +1,115 @@
+\documentclass[pdf,9pt]{beamer}
+\usepackage{listings,graphicx,verbatimbox,hyperref}
+\usepackage{hyperref}
+\usepackage{bibentry}
+\usepackage[customcolors,shade]{hf-tikz}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ceil}[1]{\lceil#1\rceil}
+\newcommand{\ov}{\overline}
+\newcommand{\cleq}{\preccurlyeq}
+\newcommand{\cgeq}{\succcurlyeq}
+\newcommand{\bdy}{\textbf{\text{Bdy}}}
+\newcommand{\trace}{\text{trace}}
+\newcommand{\dom}{\textbf{dom}}
+\newcommand{\expec}{\mathbb{E}}
+\newcommand{\bigO}{\mathcal{O}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\<}{\langle}
+\renewcommand{\>}{\rangle}
+\newcommand*\oldmacro{}%
+\let\oldmacro\insertshorttitle%
+% \renewcommand*\insertshorttitle{%
+%   \oldmacro\hfill%
+%   \insertframenumber\,/\,\inserttotalframenumber}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% use the below command to restart numbering in an enumeration, using alphabetics
+% \setbeamertemplate{enumerate item}{(\alph{enumi})}
+% \setbeamertemplate{enumerate subitem}{(\roman{enumii})}
+
+\usetheme{Warsaw}
+% \setbeamertemplate{footline}
+% {
+%   \leavevmode%
+%   \hbox{%
+%   \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
+%     \usebeamerfont{author in head/foot}\insertshortauthor
+%   \end{beamercolorbox}%
+%   \begin{beamercolorbox}[wd=.7\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
+%     \usebeamerfont{title in head/foot}\insertshorttitle\hspace*{3em}
+%     \insertframenumber{} / \inserttotalframenumber\hspace*{0ex}
+%   \end{beamercolorbox}}%
+%   \vskip0pt%
+% }
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{navigation symbols}{}
+\usepackage{biblatex}
+\addbibresource{tetrad.bib}
+\bibliography{tetrad}
+\usepackage{caption}
+\title{Feb 20 update}
+%\author[cmhyett@math.arizona.edu]{Criston Hyett \inst{1}\inst{2} \and Michael Chertkov \inst{1} \and Yifeng Tian \inst{2} \and Daniel Livescu \inst{2} \and Misha Stepanov \inst{1} \and Michael Woodward \inst{1}\inst{2} \and Chris Fryer \inst{2}}
+
+\graphicspath{{./figs/}}
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Feb 20 Update}
+  \begin{exampleblock}{Work Completed}
+    \begin{itemize}
+    \item Generalization over Reynolds number
+      \begin{itemize}
+      \item Re-run training at $Re = 430$
+      \item Show dependence of $g$'s for trained $Re = 430$
+      \end{itemize}
+
+    \item Explanation
+      \begin{itemize}
+      \item Can we improve performance if we train with 'weaker' normalization (maybe $\tau' = 100\tau$) so that all features are of comparable size? \textbf{Tough to train!}
+      \end{itemize}
+    \end{itemize}
+  \end{exampleblock}
+
+  \begin{block}{Work In Progress}
+    \begin{itemize}
+    \item Benefits of reduced description
+      \begin{itemize}
+      \item Posteriori tests for $Re = 240,430$ - more stable?
+      \end{itemize}
+    \end{itemize}
+  \end{block}
+  
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{frame}{Training at $Re = 240$}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{./lanl_240_nominal/fullInvars/comp_qrCMT.png}%
+    \includegraphics[width=0.5\textwidth]{./lanl_240_nominal/noHighOrderInvars/comp_qrCMT.png}
+    \caption{(left) $Q\text{-}R$ CMTs for $Re = 240$ after training, and (right) $Q\text{-}R$ CMTs for $Re = 240$ setting $\lambda_i = 0$ for $i = 3,4,5$, after training.}
+  \end{figure}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{frame}{Training at $Re = 430$}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{./jhtdb_430_nominal/comp_qrCMT.png}%
+    \includegraphics[width=0.5\textwidth]{./jhtdb_430_nominal/noHighOrderInvars/comp_qrCMT.png}
+    \caption{(left) $Q\text{-}R$ CMTs for $Re = 430$ after training using exact same architecture as $Re=240$ data, and (right) $Q\text{-}R$ CMTs for $Re = 430$ setting $\lambda_i = 0$ for $i = 3,4,5$, after training.}
+  \end{figure}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}

@@ -1,0 +1,54 @@
+To evaluate performance of the models, we rely initially on validation loss values as a coarse measure of out-of-testset performance; historically consulted $Q\text{-}R$ phase plane conditional mean tangents (CMTs) as a sanity check; then pressure Hessian eigenvector alignment PDFs as a richer measure of meaningful performance; and finally \textit{a posteriori} tests of $Q\text{-}R$ phase plane PDFs and VGT component PDFs. Comparison of minimum validation loss values tend to indicate general performance across this set of measures, while the remaining measures are in order of increasing physical significance.
+
+
+
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.5\textwidth]{qr_cmt.png}
+  \caption{Qualitatively, the $Q\text{-}R$ conditional mean tangents match the performance of the TBNN}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.5\textwidth]{eigenvector_alignment.png}
+  \caption{The ConvTBNN outperforms the TBNN in pressure Hessian eigenvector alignment PDF}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.5\textwidth]{temporal_conv_kernels_minmax.png}
+  \caption{Note 3 items: 1) The convolution weights are small in far history, and for short kernels no flat tails are observed; 2) Weights are small for very recent history; 3) Weights in some importance region increase monotonically.}
+\end{figure}
+
+
+% \subsection{TBNN reproduction}
+% After implementing this network architecture and finding the hyperparameters above, the results in figure(\ref{fig:tbnn_reproduction_results}) were found. These results agree well with the original paper, and suggest the hyperparameter choices were accurate.
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.5\textwidth]{trained_tbnn_loss.png}%
+%     \includegraphics[width=0.5\textwidth]{tbnn_ph_eig_align.png}
+%     \caption{(left) Loss as a function of epoch for the TBNN, (right) PDFs of eigenvalue alignment for the pressure hessian, sorted from smallest to largest eigenvalue left to right. These plots agree well with results from Tian et.al's paper, suggesting the implementation is correct.}
+%     \label{fig:tbnn_reproduction_results}
+% \end{figure}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.5\textwidth]{conv_tbnn_loss.png}%
+%     \includegraphics[width=0.5\textwidth]{conv_tbnn_ph_eig_align.png}
+%     \caption{Preliminary results of training the convTBNN. (Left) shows the loss vs epoch, with the minimum loss obtained by the unmodified TBNN marked in horizontal red, and the convTBNN in blue. (Right) shows the alignment PDFs of eigenvectors of the PH. Here $e_1$ corresponds to the eigenvector with the greatest associated eigenvalue. Note that compared to fig(\ref{fig:tbnn_reproduction_results}), all alignment PDFs are better, shifting significant density from the misaligned (larger $\theta$) to aligned.}
+%     \label{fig:conv_tbnn_results}
+% \end{figure}
+
+% \subsection{Temporal Convolution TBNN}
+% Preliminary results suggest that the additional historical information of the VGT is in fact useful for the prediction of the PH. In figure(\ref{fig:conv_tbnn_results}), results of training the temporal convolution TBNN (convTBNN) are shown, improving both in the loss and eigenvector alignment metrics.
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.5\textwidth]{temporal_conv_kernel.png}
+%     \caption{The weights of the learned temporal convolution kernel. This may act as a stand-in for a measure of significance for VGT history as it relates to the prediction of the PH. If these results hold across many trainings, it would suggest that only "recent" history is informative in prediction of the PH.}
+%     \label{fig:conv_kernel}
+% \end{figure}
+% An interesting aspect of the convTBNN is the ability to inspect the kernel length - loosely the length over which the network found it useful to set weights away from zero. Figure(\ref{fig:conv_kernel}) displays the weights as a function of kernel entry number. The sampling in time occurs every $20\Delta t$, where $\Delta t = 3e-4$ and the Kolmogorov timescale is $\tau \approx 3e-3$, so that the sampling occurs about every $2\tau$. We see that only the last three weights are nonzero, suggesting that a history of about $6\tau$ is useful in prediction.

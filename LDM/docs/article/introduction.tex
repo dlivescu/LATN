@@ -1,0 +1,33 @@
+
+% The Lagrangian velocity gradient tensor (VGT) is a fundamental quantity in turbulence. 
+% It displays characteristic non-Gaussian statistics (e.g., intermittency), describes the deformation rate of a fluid volume, and encapsulates alignment between strain and vorticity \cite{meneveau2011lagrangian}.
+% % connect fundamental nature of VGT to its role in turbulence models
+% Creating reduced-order models for the evolution of the VGT increases the fidelity of smallest-scale closures in e.g. LES \cite{needed}.
+
+% % Make the negative statement "too expensive to directly compute" and motivate the need for ROMs
+% Despite ever-growing computation capability, direct numerical simulation (DNS) of Navier-Stokes is still prohibitively expensive for realistic Reynolds numbers.
+
+
+% % Now introduce the family of ROMs
+
+% % Since the pioneering work of Viellefosse \cite{viellefosse1982} and the study of Cantwell\cite{cantwell1990} that showed that no exact local model exists for the evolution of the VGT, closure models for the VGT have received considerable attention;
+% Since the pioneering work of Viellefosse \cite{viellefosse1982}, the VGT has received considerable attention; reinvigorated recently by enormous datasets generated via DNS.
+% Machine learning (ML), specifically physics-informed machine learning (PIML), has shown remarkable ability to glean predictive capability from these large datasets, suggesting that unexploited patterns exist in the physics that we are still unaware of.
+
+% % ----- rewrite progress -----
+% Of particular note in recent years is the Recent Deformation of Gaussian Fields model (RDGF) \cite{johnson2016}, wherein the authors postulate a closure of the VGT evolution equations via choosing a Gaussian upstream condition that is deformed according to the current VGT. This hypothesis is in the same spirit as the Tetrad model from Chertkov et.al \cite{chertkov1999} that proposed a local closure to the VGT equations, by closing the equations for the VGT using deformation of a small fluid element. 
+
+% In the realm of machine learning, this work is inspired by Tian et.al\cite{tian2021}, that used a highly structured, so-called Tensor Basis Neural Network (TBNN) architecture to close the equations. This network structure was inspired by theoretical work by \cite{pope1975}, \cite{lawson2015}, \cite{johnson2016}. It has been shown to explicitly respect Galilean and rotational invariance, enforce incompressibility, and after training, can predict many quantities of interest in the statistics of the VGT.
+
+% Our goals in this paper are to advance the phenomenology via data analysis, and leverage this to improve the TBNN methodology to better predict the statistical evolution of the VGT.
+
+
+The Lagrangian velocity gradient tensor (VGT) captures many fundamental aspects of turbulence; it displays non-Gaussian statistics (e.g., intermittency) including those of energy dissipation, describes the deformation rate of a fluid volume, and encapsulates alignment between strain and vorticity.
+Because of its fundamental nature, understanding the evolution of the VGT is central to modern turbulent modeling challenges. E.g., creating better sub-grid models in LES\cite{silvis2017}.
+However, despite ever-growing computation capability, resolving the VGT using direct numerical simulation (DNS) of Navier-Stokes is still prohibitively expensive for realistic Reynolds numbers.
+
+Initiated by the work of Viellefosse, who examined keeping only the purely local contribution to the VGT evolution, "local closures" for the evolution of the VGT have recieved considerable attention. Viellefosse and subsequent work from Cantwell showed a finite time singularity originating from this so-called Restricted Euler dynamics. Further development in these local closures worked to resolve this finite time singularity; e.g., stochastic diffusion model\cite{girimaji1990diffusion}, linear damping model \cite{martin1998dynamics}, tetrad model \cite{chertkov1999}, linear diffusion model\cite{jeong2003velocity}, recent fluid deformation approximation \cite{chevillard2006lagrangian}, among others\cite{meneveau2011lagrangian}.
+
+Throughout this development, analysis of DNS datasets have motivated and tested model hypotheses. This hisory of data-driven synthesis dovetails naturally with advances in machine learning (ML). While ML has been applied liberally to turbulence in the Eularian frame, see e.g., \cite{duraisamy2019} \cite{pandey2020}, only recently has it been applied to Lagrangian turbulence, \cite{buaria2023}\cite{liu2023}.
+
+Building on the phenomenological ideas of Lagrangian deformation, and parameterizing these contributions using PIML, we create a parameterized Lagrangian deformation model (PLD). The rest of the manuscript is organized as follows: in section \ref{sec:prev_work} we present the two driving approaches and establish recent state-of-the-art, in section \ref{sec:methods} we present the PLD model, its connection to previous Lagrangian deformation approaches, and finally present results in \ref{sec:results}.

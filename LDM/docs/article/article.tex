@@ -1,0 +1,77 @@
+\documentclass[12pt]{article}
+\usepackage[margin=1.0in]{geometry}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ceil}[1]{\lceil#1\rceil}
+\newcommand{\ov}{\overline}
+\newcommand{\cleq}{\preccurlyeq}
+\newcommand{\cgeq}{\succcurlyeq}
+\newcommand{\bdy}{\textbf{\text{Bdy}}}
+\newcommand{\trace}{\text{trace}}
+\newcommand{\dom}{\textbf{dom}}
+\newcommand{\expec}{\mathbb{E}}
+\newcommand{\bigO}{\mathcal{O}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\<}{\langle}
+\renewcommand{\>}{\rangle}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{xspace}
+\usepackage{url,comment,bm}
+
+% \usepackage{titlesec}
+% \setcounter{secnumdepth}{4}
+% \titleformat{\paragraph}
+% {\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+% \titlespacing*{\paragraph}
+% {0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+
+% please pick visible and different from others colours - see list at the end of the page https://www.overleaf.com/learn/latex/Using_colours_in_LaTeX
+\newcommand{\misha}[1]{{\color{Maroon} Misha says: #1\xspace}}
+
+\newcommand{\todo}[1]{{\color{Red} TODO: #1\xspace}}
+
+
+\title{Velocity gradient prediction using parameterized Lagrangian deformation models}
+
+\author{Criston Hyett, Yifeng Tian, Michael Woodward, Misha Stepanov,\\ Chris Fryer, Michael Chertkov, Daniel Livescu}
+
+\graphicspath{{./figs/}}
+\begin{document}
+\maketitle
+\abstract{
+\input{abstract}
+}
+
+\section{Introduction} \label{sec:intro}
+\input{introduction.tex}
+
+\section{Background} \label{sec:prev_work}
+\input{previousWork.tex}
+
+\section{Methodology} \label{sec:methods}
+\input{methodology.tex}
+
+\section{Results} \label{sec:results}
+\input{results.tex}
+
+\section{Conclusion} \label{sec:conclusion}
+\input{conclusion.tex}
+
+% \section{Appendix}
+% \input{appendix.tex}
+
+% \nocite{*}
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
