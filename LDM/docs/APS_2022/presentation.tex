@@ -1,0 +1,466 @@
+\documentclass[dvipsnames,pdf,9pt]{beamer}
+\usepackage{listings,graphicx,verbatimbox,hyperref}
+\usepackage{hyperref}
+%\usepackage{bibentry}
+% \usepackage[customcolors,shade]{hf-tikz}
+% \usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{xcolor}
+
+\newcommand*{\colorboxed}{}
+\def\colorboxed#1#{%
+  \colorboxedAux{#1}%
+}
+\newcommand*{\colorboxedAux}[3]{%
+  % #1: optional argument for color model
+  % #2: color specification
+  % #3: formula
+  \begingroup
+  \colorlet{cb@saved}{.}%
+  \color#1{#2}%
+  \boxed{%
+    \color{cb@saved}%
+    #3%
+  }%
+  \endgroup
+}
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ceil}[1]{\lceil#1\rceil}
+\newcommand{\ov}{\overline}
+\newcommand{\cleq}{\preccurlyeq}
+\newcommand{\cgeq}{\succcurlyeq}
+\newcommand{\bdy}{\textbf{\text{Bdy}}}
+\newcommand{\trace}{\text{trace}}
+\newcommand{\dom}{\textbf{dom}}
+\newcommand{\expec}{\mathbb{E}}
+\newcommand{\bigO}{\mathcal{O}}
+\newcommand{\tr}{\text{tr}}
+\newcommand{\<}{\langle}
+\renewcommand{\>}{\rangle}
+\newcommand*\oldmacro{}%
+\let\oldmacro\insertshorttitle%
+% \renewcommand*\insertshorttitle{%
+% \oldmacro\hfill%
+% \insertframenumber\,/\,\inserttotalframenumber}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% use the below command to restart numbering in an enumeration, using alphabetics
+% \setbeamertemplate{enumerate item}{(\alph{enumi})}
+% \setbeamertemplate{enumerate subitem}{(\roman{enumii})}
+\setbeamertemplate{navigation symbols}{}
+
+% \usetheme{Warsaw}
+
+\usepackage[style=nature]{biblatex}
+\addbibresource{refs.bib}
+
+\DeclareCiteCommand{\footcite}[\mkbibfootnote]
+  {\usebibmacro{prenote}}
+  {\printnames[family-given]{labelname}%
+   \hspace{1mm} \printfield{journaltitle}%
+   \hspace{1mm} \printfield{year}}
+  {\addsemicolon\space}
+  {\usebibmacro{postnote}}
+
+\setbeamertemplate{footline}
+{
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.3\paperwidth,ht=2.25ex,dp=1ex,center]{author in head/foot}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.7\paperwidth,ht=2.25ex,dp=1ex,center]{title in head/foot}%
+      \usebeamerfont{title in head/foot}\insertshorttitle\hspace*{3em}
+      \insertframenumber{} / \inserttotalframenumber\hspace*{1ex}
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+\setbeamersize{text margin left=5mm,text margin right=7mm}
+
+\usepackage{caption}
+\title{Interpretable Machine Learning for Predicting the Evolution of the Velocity Gradient Tensor}
+\author[cmhyett@math.arizona.edu]{Criston Hyett \inst{1}\inst{2} \and Michael Chertkov \inst{1} \and Yifeng Tian \inst{3} \and Daniel Livescu \inst{2} \and Misha Stepanov \inst{1} \and Michael Woodward \inst{1}\inst{2} \and Chris Fryer \inst{2}}
+\institute[shortinst]{\inst{1} Program in Applied Mathematics, University of Arizona \and
+  \inst{2} CCS-2, Los Alamos National Labs \and \inst{3} CCS-3, Los Alamos National Labs}
+
+\def\bb_{f}
+
+\begin{document}
+\graphicspath{{./figures/}}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% \if\bb_t
+% \begin{frame}{bb slide}
+
+% \end{frame}
+% \fi
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Roadmap}
+  \begin{itemize}
+  \item Building on the successful methodology of the \textbf{Tensor Basis Neural Network}, we present the existence of a \textbf{reduced description} in predicting the mean \textbf{deviatoric pressure hessian} using only the Lagrangian \textbf{velocity gradient tensor}
+
+  \item We use this reduced description to \textbf{search for interpretability}.
+    
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Governing Equations for the Velocity Gradient Tensor}
+  \begin{itemize}
+  \item The \textbf{velocity gradient tensor} (VGT) is defined by $A_{ij} = \frac{\partial u_i}{\partial x_j}$, so from Navier Stokes
+    \begin{equation} \label{eq:NS}
+      \frac{\partial u_i}{\partial t} + u_k \frac{\partial u_i}{\partial x_k} = -\frac{\partial P}{\partial x_i} + \nu \frac{\partial^2 u_i}{\partial x_k \partial x_k}
+    \end{equation}
+
+  \item We apply spatial derivatives, and use incompressibility to find the governing equations for the \textbf{Lagrangian VGT}:      
+    \begin{equation}
+      \frac{dA_{ij}}{dt} =
+      - \colorboxed{green}{\left(A_{ik}A_{kj} - \frac{1}{3}A_{mn}A_{nm}\delta_{ij}\right)}
+      - \colorboxed{red}{\left(\frac{\partial^2 P}{\partial x_i \partial x_j} -\frac{1}{3}\frac{\partial^2 P}{\partial x_k \partial x_k}\delta_{ij}\right)}
+      + \colorboxed{blue}{\nu \frac{\partial^2 A_{ij}}{\partial x_k \partial x_k}}
+    \end{equation}
+    % \begin{equation}
+    %   \frac{dA_{ij}}{dt} = \frac{\partial A_{ij}}{\partial t} + u_k \frac{\partial A_{ij}}{\partial x_k} = - A_{ik}A_{kj} - \frac{\partial^2 P}{\partial x_i \partial x_j} + \nu \frac{\partial^2 A_{ij}}{\partial x_k \partial x_k}
+    % \end{equation}
+
+    % \item and use incompressibility,
+    %   \begin{equation}
+    %     \frac{\partial^2 P}{\partial x_k \partial x_k} = - A_{ij}A_{ji}
+    %   \end{equation}
+    % \item To find the governing equation for the VGT
+
+  \item The main challenge is to predict the nonlocal \textbf{deviatoric pressure hessian}, defined as
+    \begin{equation}
+      H_{ij} = - \left( \frac{\partial^2 P}{\partial x_i \partial x_j} - \frac{1}{3}\frac{\partial P}{\partial x_k \partial x_k}\delta_{ij}  \right)
+    \end{equation}
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Tensor Basis Neural Network}
+  \begin{itemize}
+  \item We can write the formal solution for the deviatoric pressure hessian as\footcite{ohkitani1995}
+    \begin{equation}
+      H_{ij}(\textbf{x}) = \iiint \frac{\delta_{ij} - \hat{r_i}\hat{r_j}}{2\pi r^3}Q(\textbf{x} + \textbf{r})d\textbf{r}
+    \end{equation}
+  \item Using a Taylor expansion, Cayley-Hamilton Theorem, and Tensor Basis expansion\footcite{pope1975}, we can write
+    \begin{equation}
+      \hat{H} = \sum_{i=1}^{10} g^{(i)}(\lambda_1, \dots, \lambda_5)\cdot \hat{T}^{(i)}(\hat{A})
+    \end{equation}
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Tensor Basis Neural Network}
+  \begin{equation}
+    \hat{H} = \sum_{i=1}^{10} g^{(i)}(\lambda_1, \dots, \lambda_5)\cdot \hat{T}^{(i)}(\hat{A})
+  \end{equation}  
+  \begin{equation*}
+    \lambda_1 = \tr(\hat{S}^2) \quad \lambda_2 = \tr(\hat{W}^2) \quad \lambda_3 = \tr(\hat{S}^3) \quad \lambda_4 = \tr(\hat{W}^2\hat{S}) \quad \lambda_5 = \tr(\hat{W}^2\hat{S}^2)
+  \end{equation*}
+
+  \begin{align*}
+    &T^{(1)} = S &T^{(2)} &= SW-WS\\
+    &T^{(3)} = S^2 - \frac{1}{3}I \cdot \tr(S^2) &T^{(4)} &= W^2 - \frac{1}{3}I \cdot \tr(W^2)\\
+    &T^{(5)} = WS^2 - S^2W &T^{(6)} &= W^2S + SW^2 - \frac{2}{3}I \cdot \tr(SW^2)\\
+    &T^{(7)} = WSW^2-W^2SW &T^{(8)} &= SWS^2 - S^2WS\\
+    &T^{(9)} = W^2S^2 + S^2W^2 - \frac{2}{3}I \cdot \tr(S^2W^2) &T^{(10)} &= WS^2W^2 - W^2S^2W
+  \end{align*}
+
+  \begin{itemize}
+  \item We use the natural timescale $\tau = \langle \norm{S^2}_2 \rangle^{-1}$ to normalize our VGT, and thus all of the $\lambda_i, T^{(j)}$.
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Tensor Basis Neural Network}
+
+  \begin{equation}
+    \hat{H} = \sum_{i=1}^{10} g\textcolor{blue}{_{\theta}}^{(i)}(\lambda_1, \dots, \lambda_5)\cdot \hat{T}^{(i)}(\hat{A})
+  \end{equation}
+
+  \begin{small}
+    \begin{equation*}
+      \lambda_1 = \tr(\hat{S}^2) \quad \lambda_2 = \tr(\hat{W}^2) \quad \lambda_3 = \tr(\hat{S}^3) \quad \lambda_4 = \tr(\hat{W}^2\hat{S}) \quad \lambda_5 = \tr(\hat{W}^2\hat{S}^2)
+    \end{equation*}
+  \end{small}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{./tbnn.png}
+    \label{fig:tbnn}
+  \end{figure}
+
+  \begin{equation}
+    L(\theta) = \frac{1}{N}\sum^N\norm{\hat{H}_{\text{truth}} - \sum_{i=1}^{10}g_\theta^{(i)}(\lambda_1, \dots, \lambda_5)T^{(i)}}_2^2
+  \end{equation}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Previous Work}
+  \begin{itemize}
+  \item Previous phenomenological models attempted to use a truncated tensor basis expansion\footcite{johnson2016}\footcite{lawson2015}
+  \item Tian, et.al \footcite{tian2021} showed a significant improvement using the full tensor basis, and learning the $g^{(i)}$ from data.
+  \item \begin{small}\textbf{We investigate Tian, et.al's methodology to find that $g(\lambda_1, \dots, \lambda_5) \approx g(\lambda_1, \lambda_2)$}.\end{small}
+  \end{itemize}
+
+  \begin{figure}
+    \includegraphics[width=0.6\textwidth]{yifengQRComparison.png}
+    \caption{Results from Tian et.al showing: (left) DNS projection into the $QR$ plane, (right) predicted $QR$ CMTs from the TBNN}
+  \end{figure}
+
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Tensor Basis Neural Network}
+  \begin{equation}
+    \hat{H} = \sum_{i=1}^{10} g\textcolor{blue}{_{\theta}}^{(i)}(\lambda_1, \dots, \lambda_5)\cdot \hat{T}^{(i)}(\hat{A})
+  \end{equation}
+
+  \begin{small}
+    \begin{equation*}
+      \lambda_1 = \tr(\hat{S}^2) \quad \lambda_2 = \tr(\hat{W}^2) \quad \lambda_3 = \tr(\hat{S}^3) \quad \lambda_4 = \tr(\hat{W}^2\hat{S}) \quad \lambda_5 = \tr(\hat{W}^2\hat{S}^2)
+    \end{equation*}
+  \end{small}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.5\textwidth]{./tbnn_latent.png}
+    \label{fig:tbnn_latent}
+  \end{figure}
+
+  \begin{equation}
+    L(\theta) = \frac{1}{N}\sum^N\norm{\hat{H}_{\text{truth}} - \sum_{i=1}^{10}g_\theta^{(i)}(\lambda_1, \dots, \lambda_5)T^{(i)}}_2^2
+  \end{equation}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Distributions of sensitivity to parameter variability}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.75\textwidth]{./pi512/dgdl_1.png}
+  \end{figure}
+  \begin{itemize}
+  \item We found the \textbf{reduced description} via observing \textbf{distributions of sensitivity} of the \textbf{scalar functions} $g^{(i)}$ to \textbf{variability of parameters} $\lambda_j$.
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Reduced Description}
+  \begin{columns}
+    \column{0.33\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=1.0\textwidth]{./pi512/dgdl_1.png}
+    \end{figure}
+
+    \column{0.33\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=1.0\textwidth]{./pi512/dgdl_2.png}
+    \end{figure}
+
+    \column{0.33\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=1.0\textwidth]{./pi512/dgdl_3.png}
+    \end{figure}
+  \end{columns}
+
+  \begin{columns}
+    \column{0.5\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=0.66\textwidth]{./pi512/dgdl_4.png}
+    \end{figure}
+
+    \column{0.5\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=0.66\textwidth]{./pi512/dgdl_5.png}
+    \end{figure}
+  \end{columns}
+
+  \begin{itemize}
+  \item We found the \textbf{reduced description} via observing \textbf{distributions of sensitivity} of the \textbf{scalar functions} $g^{(i)}$ to \textbf{variability of parameters} $\lambda_j$.
+  \end{itemize}
+  
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{A priori tests of reduced description}
+  \begin{figure}
+    \centering
+\includegraphics[width=0.8\textwidth]{./comp_qrCMT.png}
+    \caption{Comparison of Pressure Hessian contribution to $Q$-$R$ CMTs using all five invariants (blue), and only the first two (red)}
+  \end{figure}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{$g^{(i)}(\lambda_1, \lambda_2)$}
+  \begin{columns}
+    \column{0.33\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g1.png}
+    \end{figure}
+
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g4.png}
+    \end{figure}
+
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g7.png}
+    \end{figure}
+
+    \column{0.33\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g2.png}
+    \end{figure}
+
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g5.png}
+    \end{figure}
+
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g8.png}
+    \end{figure}
+
+    \column{0.33\textwidth}
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g3.png}
+    \end{figure}
+
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g6.png}
+    \end{figure}
+
+    \begin{figure}
+      \centering
+      \includegraphics[width=\textwidth]{./pi512/gFunctions/g9.png}
+    \end{figure}
+
+  \end{columns}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Is a further reduction possible?}
+  \begin{figure}
+    \centering
+\includegraphics[width=0.8\textwidth]{./pi512/contributions.png}
+  \end{figure}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% \begin{frame}{Remedy}
+%   \begin{itemize}
+%   \item Our idea is to break the degeneracy by enlarging the state-space, e.g. making similar measurements of the CGVGT more easily differentiated.
+%   \item We desired to do this using geometry - postulating many different options we ran into ambiguities of defining these coarse-grained geometries across filtered fields.
+%   \item Particularly, was the evolution of this extended body by via the filtered fields, via the true field and then coarse grained, and what about the tracer particle defining the locations of measurement for the velocity gradient itself?
+%   \end{itemize}
+% \end{frame}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% \begin{frame}{Particle Based Coarse Graining}
+%   \begin{itemize}
+%   \item We struggled to find physically consistent answers to these questions, and motivated by the idea of Lagrangian geometries (and particularly tetrads [cite:Misha]), we postulated a new object - a purely Lagrangian definition of the CGVGT and a natural associated geometry.
+%   \item Given a velocity field $\vec{u}(t)$, we release a cloud of particles at very small scale, and track their individual positions and VGTs until the cloud has reached some desired scale $L > \eta$.
+%   \item We can then unambiguously define a center of mass, CGVGT and associated geometrical object. 
+%   \end{itemize}
+% \end{frame}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% \begin{frame}{Statistics of the Particle-Based CGVGT}
+%   \begin{itemize}
+%   \item As this is a new physical object, we seek first to investigate the joint statistics of the $M,I$ to determine if expectations are met and/or insights can be gleaned.
+%   \end{itemize}
+% \end{frame}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% \begin{frame}{A priori tests of reduced description - filtered VGT}
+%   \begin{figure}
+%     \centering
+%     \includegraphics[width=0.4\textwidth]{./pi32/lossComp.png}
+%   \end{figure}
+
+%   \begin{columns}
+%     \column{0.5\textwidth}
+%     \begin{figure}
+%       \centering
+%       \includegraphics[width=0.8\textwidth]{./pi32/latent_comp_qrCMT.png}
+%       \caption{$QR$ prediction only using $\lambda_1, \lambda_2$}
+%     \end{figure}
+
+%     \column{0.5\textwidth}
+%     \begin{figure}
+%       \centering
+%       \includegraphics[width=0.8\textwidth]{./pi32/fullDim_comp_qrCMT.png}
+%       \caption{$QR$ prediction using full set of invariants}
+%     \end{figure}    
+
+%   \end{columns}
+% \end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{Conclusions \& Future Work}
+  \begin{itemize}
+  \item Conclusions
+    \begin{itemize}
+    \item We investigated the successful methodology of the TBNN to find there exists a reduced parameterization of the scalar functions weighting the tensor basis contributions.
+    \item This reduced parameterization allowed us to more readily understand the functional dependence on the invariants
+    \item This model reduction will be important as we extend the methodology to coarse-grained predictions
+    \end{itemize}
+  \item Future Work
+    \begin{itemize}
+    \item Does this reduced parameterization generalize over Reynold's number?
+    \item Can we tease out a functional form for the $g^{(i)}$?
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}{References}
+  \printbibliography
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\end{document}

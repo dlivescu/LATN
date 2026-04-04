@@ -1,0 +1,202 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.1 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global}
+    \entry{ohkitani1995}{article}{}
+      \name{author}{2}{}{%
+        {{hash=8cbb9bd1bc99f007e31fde15c804d425}{%
+           family={Ohkitani},
+           familyi={O\bibinitperiod},
+           given={Koji},
+           giveni={K\bibinitperiod}}}%
+        {{hash=e5b1ce09437050b0433b8f9eb8a7ca43}{%
+           family={Kishiba},
+           familyi={K\bibinitperiod},
+           given={Seigo},
+           giveni={S\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {American Institute of Physics}%
+      }
+      \strng{namehash}{871d67a91588e30448959a987ade71b2}
+      \strng{fullhash}{871d67a91588e30448959a987ade71b2}
+      \strng{bibnamehash}{871d67a91588e30448959a987ade71b2}
+      \strng{authorbibnamehash}{871d67a91588e30448959a987ade71b2}
+      \strng{authornamehash}{871d67a91588e30448959a987ade71b2}
+      \strng{authorfullhash}{871d67a91588e30448959a987ade71b2}
+      \field{sortinit}{1}
+      \field{sortinithash}{50c6687d7fc80f50136d75228e3c59ba}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Physics of Fluids}
+      \field{number}{2}
+      \field{title}{Nonlocal nature of vortex stretching in an inviscid fluid}
+      \field{volume}{7}
+      \field{year}{1995}
+      \field{pages}{411\bibrangedash 421}
+      \range{pages}{11}
+    \endentry
+    \entry{pope1975}{article}{}
+      \name{author}{1}{}{%
+        {{hash=0df85bf2c259df7fdc0a9a5bccfc8fd1}{%
+           family={Pope},
+           familyi={P\bibinitperiod},
+           given={S.\bibnamedelimi B.},
+           giveni={S\bibinitperiod\bibinitdelim B\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Cambridge University Press}%
+      }
+      \strng{namehash}{0df85bf2c259df7fdc0a9a5bccfc8fd1}
+      \strng{fullhash}{0df85bf2c259df7fdc0a9a5bccfc8fd1}
+      \strng{bibnamehash}{0df85bf2c259df7fdc0a9a5bccfc8fd1}
+      \strng{authorbibnamehash}{0df85bf2c259df7fdc0a9a5bccfc8fd1}
+      \strng{authornamehash}{0df85bf2c259df7fdc0a9a5bccfc8fd1}
+      \strng{authorfullhash}{0df85bf2c259df7fdc0a9a5bccfc8fd1}
+      \field{sortinit}{2}
+      \field{sortinithash}{ed39bb39cf854d5250e95b1c1f94f4ed}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Journal of Fluid Mechanics}
+      \field{number}{2}
+      \field{title}{A more general effective-viscosity hypothesis}
+      \field{volume}{72}
+      \field{year}{1975}
+      \field{pages}{331\bibrangedash 340}
+      \range{pages}{10}
+      \verb{doi}
+      \verb 10.1017/S0022112075003382
+      \endverb
+    \endentry
+    \entry{johnson2016}{article}{}
+      \name{author}{2}{}{%
+        {{hash=aa8dd70781df46f01bdc79180a154012}{%
+           family={Johnson},
+           familyi={J\bibinitperiod},
+           given={Perry\bibnamedelima L.},
+           giveni={P\bibinitperiod\bibinitdelim L\bibinitperiod}}}%
+        {{hash=58a9ae49c9f5acec6314c7fe3760b938}{%
+           family={Meneveau},
+           familyi={M\bibinitperiod},
+           given={Charles},
+           giveni={C\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Cambridge University Press}%
+      }
+      \strng{namehash}{2adfee71e1ac877b0abc95a266913c97}
+      \strng{fullhash}{2adfee71e1ac877b0abc95a266913c97}
+      \strng{bibnamehash}{2adfee71e1ac877b0abc95a266913c97}
+      \strng{authorbibnamehash}{2adfee71e1ac877b0abc95a266913c97}
+      \strng{authornamehash}{2adfee71e1ac877b0abc95a266913c97}
+      \strng{authorfullhash}{2adfee71e1ac877b0abc95a266913c97}
+      \field{sortinit}{3}
+      \field{sortinithash}{a37a8ef248a93c322189792c34fc68c9}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Journal of Fluid Mechanics}
+      \field{title}{A closure for Lagrangian velocity gradient evolution in turbulence using recent-deformation mapping of initially Gaussian fields}
+      \field{volume}{804}
+      \field{year}{2016}
+      \field{pages}{387\bibrangedash 419}
+      \range{pages}{33}
+      \verb{doi}
+      \verb 10.1017/jfm.2016.551
+      \endverb
+    \endentry
+    \entry{lawson2015}{article}{}
+      \name{author}{2}{}{%
+        {{hash=c8d1c0a9d1bb9403e3d92b402c951950}{%
+           family={Lawson},
+           familyi={L\bibinitperiod},
+           given={J.\bibnamedelimi M.},
+           giveni={J\bibinitperiod\bibinitdelim M\bibinitperiod}}}%
+        {{hash=f0e45913561ff9fa9e3d395e0577f52f}{%
+           family={Dawson},
+           familyi={D\bibinitperiod},
+           given={J.\bibnamedelimi R.},
+           giveni={J\bibinitperiod\bibinitdelim R\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Cambridge University Press}%
+      }
+      \strng{namehash}{7b54c70d37d158717f2c940ac4c5bb43}
+      \strng{fullhash}{7b54c70d37d158717f2c940ac4c5bb43}
+      \strng{bibnamehash}{7b54c70d37d158717f2c940ac4c5bb43}
+      \strng{authorbibnamehash}{7b54c70d37d158717f2c940ac4c5bb43}
+      \strng{authornamehash}{7b54c70d37d158717f2c940ac4c5bb43}
+      \strng{authorfullhash}{7b54c70d37d158717f2c940ac4c5bb43}
+      \field{sortinit}{4}
+      \field{sortinithash}{e071e0bcb44634fab398d68ad04e69f4}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Journal of Fluid Mechanics}
+      \field{title}{On velocity gradient dynamics and turbulent structure}
+      \field{volume}{780}
+      \field{year}{2015}
+      \field{pages}{60\bibrangedash 98}
+      \range{pages}{39}
+      \verb{doi}
+      \verb 10.1017/jfm.2015.452
+      \endverb
+    \endentry
+    \entry{tian2021}{article}{}
+      \name{author}{3}{}{%
+        {{hash=460ccfa6233ccd00d3c1a2bf6e9765f3}{%
+           family={Tian},
+           familyi={T\bibinitperiod},
+           given={Yifeng},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=daef2cdb67050d8052eb24d18dd25c59}{%
+           family={Livescu},
+           familyi={L\bibinitperiod},
+           given={Daniel},
+           giveni={D\bibinitperiod}}}%
+        {{hash=46998e4a225376d42b55b09ea1f2fe5a}{%
+           family={Chertkov},
+           familyi={C\bibinitperiod},
+           given={Michael},
+           giveni={M\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {APS}%
+      }
+      \strng{namehash}{4c6733027d6408cb504d05f94e039a98}
+      \strng{fullhash}{25ea7aa38a6c3815184bc6829e35b61b}
+      \strng{bibnamehash}{25ea7aa38a6c3815184bc6829e35b61b}
+      \strng{authorbibnamehash}{25ea7aa38a6c3815184bc6829e35b61b}
+      \strng{authornamehash}{4c6733027d6408cb504d05f94e039a98}
+      \strng{authorfullhash}{25ea7aa38a6c3815184bc6829e35b61b}
+      \field{sortinit}{5}
+      \field{sortinithash}{5dd416adbafacc8226114bc0202d5fdd}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Physical Review Fluids}
+      \field{number}{9}
+      \field{title}{Physics-informed machine learning of the Lagrangian dynamics of velocity gradient tensor}
+      \field{volume}{6}
+      \field{year}{2021}
+      \field{pages}{094607}
+      \range{pages}{1}
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+
