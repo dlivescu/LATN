@@ -1,0 +1,20 @@
+# Minimal runtime deps for the runner.py training path on a fresh AWS GPU box.
+#
+# The sibling requirements.txt pins conda-built wheels via `@ file:///...`
+# paths that DO NOT exist on a fresh instance and break `pip install`.
+# This file lists only what `src/runner.py` -> {utils, lagrdataset, latn,
+# training_utils, distributed} actually import at runtime.
+#
+# Install torch from the CUDA 12.4 wheel index (matches the laptop env
+# torch 2.5.1+cu124):
+#
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install --upgrade pip
+#   pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+#   pip install -r python_config/requirements-aws.txt
+#
+# (matplotlib / POT / h5py are only needed for postprocessing notebooks,
+#  not for training, so they are intentionally omitted here.)
+
+numpy==1.26.4
+tensorboard==2.20.0
