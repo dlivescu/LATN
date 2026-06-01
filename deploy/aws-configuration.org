@@ -1,0 +1,653 @@
+#+TITLE: AWS Configuration Walkthrough — running LDM training in the cloud
+#+OPTIONS: toc:2 num:t
+#+STARTUP: overview
+
+This document takes you from a bare AWS account to a running LATN training job,
+one step at a time. Each step says *what it is*, *why it matters in the bigger
+picture*, and gives the *exact CLI command(s)*. Replace ~<ANGLE_BRACKET>~
+placeholders with your values.
+
+Concrete facts for this project:
+- Data bucket: ~s3://ua-hpc-archive/groups-data/lagrangian-vgt/~ (S3 Standard, **us-east-2**)
+- Outputs prefix (we create below): ~s3://ua-hpc-archive/groups-data/lagrangian-vgt-outputs/~
+- Instance: ~g4dn.2xlarge~ (T4 GPU, 32 GB RAM — fits the full-dataset ~20 GB peak — plus a local NVMe disk)
+- Region: **us-east-2** for everything, so S3↔EC2 transfer is free and fast.
+
+* 1. The big picture
+
+We never keep a long-lived server. Each run launches a disposable instance,
+pulls what it needs, trains, ships results to S3, and is terminated. Pieces are
+placed by *how often they change*:
+
+#+begin_example
+  change-rarely        →  baked into a custom AMI (OS + NVIDIA driver + venv)   [optional]
+  change-constantly    →  `git pull` of this repo at boot
+  large + external     →  dataset: `aws s3 sync` → local NVMe instance-store disk
+  produced each run    →  checkpoints/outputs: asynchronously synced TO S3
+
+  ┌─────────────┐   user-data    ┌──────────────────────────────────────────┐
+  │  you (CLI)  │ ─ run-instances→│  EC2 instance (us-east-2, g4dn.2xlarge)    │
+  └─────────────┘                │  1. mount NVMe → /mnt/data                 │
+        ▲                        │  2. git clone LDM                          │
+        │ aws s3 sync (results)  │  3. bootstrap.sh:                          │
+        │                        │       sync-DOWN outputs/ (for --resume)    │
+  ┌─────────────┐                │       start bg sync-UP loop + IMDS watcher │
+  │     S3      │◀───────────────│       train (runner.py --resume)           │
+  │  data +     │   async sync   │       EXIT trap → final sync-UP            │
+  │  outputs/   │───────────────▶│  4. terminate                              │
+  └─────────────┘   (down @boot) └──────────────────────────────────────────┘
+#+end_example
+
+Why this shape:
+- Checkpoints are tiny (~30–150 KB) and namespaced per hyperparameter config
+  (=runner.py= writes ~<savepath>/<config-slug>/{ph,vis}/=), so a sweep never
+  lets one config overwrite another.
+- A spot replacement re-runs the *same* user-data verbatim with **no** "I am a
+  restart" flag. Resume therefore works only because =bootstrap.sh= syncs the
+  outputs prefix *down* at boot and always passes ~--resume~; the presence of a
+  config's bundle in S3 *is* the restart signal.
+- The S3 upload runs in a background loop, never on the training thread, so the
+  GPU never stalls on S3 latency.
+
+* 2. One-time local setup
+
+Install the AWS CLI (v2) and point it at your account and region.
+
+#+begin_src sh
+# Install (Linux x86_64); see docs for other platforms.
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+unzip awscliv2.zip && sudo ./aws/install
+
+# Configure: paste the Access Key ID + Secret from an IAM user in the console
+# (IAM → Users → Security credentials → Create access key).
+aws configure
+#   AWS Access Key ID     : <YOUR_ACCESS_KEY_ID>
+#   AWS Secret Access Key : <YOUR_SECRET_ACCESS_KEY>
+#   Default region name   : us-east-2
+#   Default output format : json
+
+# Verify the CLI is talking to your account:
+aws sts get-caller-identity
+#+end_src
+
+* 3. IAM role, S3 access, and a read-only repo deploy key
+
+*What:* an IAM **role** + **instance profile**, plus a read-only GitHub **deploy
+key** stored in **SSM Parameter Store**. *Why:* instead of baking secrets onto
+the box (leak risk), the instance assumes a role and receives temporary
+credentials automatically. The role grants exactly: read the data prefix,
+read/write the outputs prefix, and read the one SSM parameter holding the deploy
+key. The deploy key (repo-scoped, read-only) is what lets the instance clone the
+**private** repo — there is no GitHub auth method that accepts an EC2 instance's
+IAM identity directly, so *some* credential is required; SSM keeps it encrypted,
+role-gated, and revocable rather than baked into the AMI or user-data.
+
+First grab your account id (used in the policy ARN below):
+
+#+begin_src sh
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "$ACCOUNT_ID"
+#+end_src
+
+#+begin_src sh
+# 3a. Trust policy: lets EC2 assume the role.
+cat > trust-policy.json <<'JSON'
+{ "Version": "2012-10-17",
+  "Statement": [{ "Effect": "Allow",
+                  "Principal": { "Service": "ec2.amazonaws.com" },
+                  "Action": "sts:AssumeRole" }] }
+JSON
+aws iam create-role --role-name ldm-training-role \
+  --assume-role-policy-document file://trust-policy.json
+
+# 3b. Access policy: S3 (data RO, outputs RW) + read the SSM deploy-key parameter.
+#     ListBucket is required for `aws s3 sync` to enumerate keys; kms:Decrypt is
+#     needed to read the SecureString, scoped to the SSM service.
+#     NOTE: this heredoc is unquoted (JSON, not 'JSON') so ${ACCOUNT_ID} expands.
+cat > access-policy.json <<JSON
+{ "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::ua-hpc-archive/groups-data/lagrangian-vgt/*" },
+    { "Effect": "Allow", "Action": ["s3:GetObject","s3:PutObject","s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::ua-hpc-archive/groups-data/lagrangian-vgt-outputs/*" },
+    { "Effect": "Allow", "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::ua-hpc-archive",
+      "Condition": { "StringLike": { "s3:prefix": [
+        "groups-data/lagrangian-vgt/*",
+        "groups-data/lagrangian-vgt-outputs/*" ] } } },
+    { "Effect": "Allow", "Action": ["ssm:GetParameter"],
+      "Resource": "arn:aws:ssm:us-east-2:${ACCOUNT_ID}:parameter/ldm/deploy-key" },
+    { "Effect": "Allow", "Action": ["kms:Decrypt"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "kms:ViaService": "ssm.us-east-2.amazonaws.com" } } }
+  ] }
+JSON
+aws iam put-role-policy --role-name ldm-training-role \
+  --policy-name ldm-access --policy-document file://access-policy.json
+
+# 3c. Wrap the role in an instance profile (what an EC2 instance actually attaches).
+aws iam create-instance-profile --instance-profile-name ldm-training-profile
+aws iam add-role-to-instance-profile \
+  --instance-profile-name ldm-training-profile --role-name ldm-training-role
+
+# 3d. Create a read-only SSH deploy key for the PRIVATE repo.
+ssh-keygen -t ed25519 -f ldm-deploy-key -N "" -C "ldm-ec2-deploy"
+cat ldm-deploy-key.pub
+#   -> GitHub: repo Settings -> Deploy keys -> Add deploy key, paste the .pub,
+#      leave "Allow write access" UNCHECKED (read-only is all the instance needs).
+
+# 3e. Store the PRIVATE key in SSM Parameter Store (encrypted at rest with the
+#     default aws/ssm KMS key). file:// keeps the key out of shell history.
+aws ssm put-parameter --region us-east-2 \
+  --name /ldm/deploy-key --type SecureString \
+  --value file://ldm-deploy-key
+# The instance fetches it via the role at boot, so delete the local copies:
+shred -u ldm-deploy-key 2>/dev/null || rm -f ldm-deploy-key
+rm -f ldm-deploy-key.pub
+#+end_src
+
+The deploy key is read-only and revocable: to rotate, delete it under GitHub
+Deploy keys, re-run 3d/3e. Like =ldm-key.pem=, the local private key must never
+be committed — 3e deletes it once it is safely in SSM.
+
+* 4. S3 layout
+
+*What:* confirm the data and create a separate prefix for outputs. *Why:* keep
+produced artifacts out of the read-only data prefix; the role above already
+scopes write access to ~lagrangian-vgt-outputs/~.
+
+#+begin_src sh
+# Confirm the three .bin files are present:
+aws s3 ls s3://ua-hpc-archive/groups-data/lagrangian-vgt/
+
+# Create the outputs "folder" (S3 has no real dirs; a prefix appears on first write,
+# but this makes intent explicit):
+aws s3api put-object --bucket ua-hpc-archive \
+  --key groups-data/lagrangian-vgt-outputs/
+
+# You OWN this bucket, so turn requester-pays OFF (else every command needs an
+# extra flag). Check, then set if needed:
+aws s3api get-bucket-request-payment --bucket ua-hpc-archive
+aws s3api put-bucket-request-payment --bucket ua-hpc-archive \
+  --request-payment-configuration Payer=BucketOwner
+#+end_src
+
+* 5. Networking and SSH access
+
+*What:* a key pair (to SSH in) and a security group (a firewall allowing SSH
+from your IP only).
+
+#+begin_src sh
+# 5a. Key pair — save the private key locally; you cannot re-download it.
+aws ec2 create-key-pair --region us-east-2 --key-name ldm-key \
+  --query 'KeyMaterial' --output text > ldm-key.pem
+chmod 400 ldm-key.pem
+
+# 5b. Security group allowing inbound SSH from your current IP only.
+aws ec2 create-security-group --region us-east-2 \
+  --group-name ldm-sg --description "LDM training SSH access"
+MYIP=$(curl -s https://checkip.amazonaws.com)
+aws ec2 authorize-security-group-ingress --region us-east-2 \
+  --group-name ldm-sg --protocol tcp --port 22 --cidr "${MYIP}/32"
+#+end_src
+
+(If your account uses a non-default VPC, reference the SG by id with
+~--security-group-ids sg-...~ on launch instead of by name.)
+
+* 6. Pick a GPU AMI
+
+*What:* the disk image the instance boots from. *Why:* the AWS Deep Learning AMI
+already has the NVIDIA driver + CUDA that match the ~torch==2.5.1+cu124~ wheel
+=bootstrap.sh= installs, so you avoid driver/CUDA mismatch pain.
+
+#+begin_src sh
+# Find the latest matching Deep Learning AMI (adjust the name filter if AWS
+# renames the line; `aws ec2 describe-images ... --owners amazon` lists options).
+aws ec2 describe-images --region us-east-2 --owners amazon \
+  --filters "Name=name,Values=Deep Learning OSS Nvidia Driver AMI GPU PyTorch*Ubuntu*" \
+            "Name=state,Values=available" \
+  --query 'reverse(sort_by(Images,&CreationDate))[:1].[ImageId,Name]' --output text
+# → note the ami-xxxxxxxx as <AMI_ID> below.
+#+end_src
+
+#+begin_src sh
+AMI_ID=ami-0627ef05d1d2bf3db
+#+end_src
+
+** TODO Build a custom AMI to replace the base Deep Learning AMI
+
+The base Deep Learning AMI is insufficient as-is:
+- ~python3.12-venv~ is not installed (needed by =bootstrap.sh= to create the venv).
+- PyTorch is *not* pre-installed in a venv — =bootstrap.sh= pip-installs it from
+  scratch on every launch (~2–3 min + bandwidth each time).
+
+#+begin_src sh :session ldm-ami-bake
+  # Step 1: launch a plain instance (no user-data) just to set it up.
+  BASE_AMI=ami-0627ef05d1d2bf3db
+  SETUP_ID=$(aws ec2 run-instances --region us-east-2 \
+    --image-id "$BASE_AMI" --instance-type g4dn.2xlarge \
+    --key-name ldm-key --security-groups ldm-sg \
+    --iam-instance-profile Name=ldm-training-profile \
+    --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":60,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ldm-ami-bake}]' \
+    --query 'Instances[0].InstanceId' --output text)
+  echo "Bake instance: $SETUP_ID"
+
+  # Step 2: wait for it to be running, then SSH in.
+  aws ec2 wait instance-running --region us-east-2 --instance-ids "$SETUP_ID"
+  IP=$(aws ec2 describe-instances --region us-east-2 --instance-ids "$SETUP_ID" \
+    --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+  echo "InstanceIP: $IP"
+#+end_src
+
+#+RESULTS:
+| Bake        |   instance: | i-0e119234bcfcc54a6 |
+| InstanceIP: | 3.19.29.236 |                     |
+
+#+begin_src sh :session ldm-ami-bake
+  # ssh is interactive!
+  ssh -i ldm-key.pem ubuntu@3.19.29.236
+#+end_src
+
+Once SSH'd in, install the missing packages and PyTorch:
+
+#+begin_src sh :session ldm-ami-bake
+# On the instance:
+sudo apt-get update -y && sudo apt-get install -y python3.12-venv
+python3 -m venv ~/venv
+source ~/venv/bin/activate
+pip install --upgrade pip
+pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+# Verify:
+python -c "import torch; print(torch.cuda.is_available(), torch.__version__)"
+deactivate
+exit
+#+end_src
+
+#+begin_src sh :session ldm-ami-bake
+  echo "$SETUP_ID"
+#+end_src
+
+#+RESULTS:
+: i-0e119234bcfcc54a6
+
+#+begin_src sh :session ldm-ami-bake
+  # Step 3: stop the instance (clean filesystem snapshot), create the AMI.
+  aws ec2 stop-instances --region us-east-2 --instance-ids "$SETUP_ID"
+  aws ec2 wait instance-stopped --region us-east-2 --instance-ids "$SETUP_ID"
+
+  CUSTOM_AMI=$(aws ec2 create-image --region us-east-2 \
+    --instance-id "$SETUP_ID" --name "ldm-training-v1" \
+    --description "Deep Learning AMI + python3.12-venv + torch 2.5.1+cu124" \
+    --query 'ImageId' --output text)
+  echo "Custom AMI: $CUSTOM_AMI"
+
+  # Step 4: wait for the AMI to be available, then terminate the bake instance.
+  aws ec2 wait image-available --region us-east-2 --image-ids "$CUSTOM_AMI"
+  aws ec2 terminate-instances --region us-east-2 --instance-ids "$SETUP_ID"
+
+  # Step 5: update AMI_ID in this file to $CUSTOM_AMI, and remove the
+  # apt-get install line from user-data.sh (no longer needed).
+#+end_src
+
+Note: the venv above (~~/venv~) is separate from the per-repo ~.venv~ that
+=bootstrap.sh= creates inside the LDM checkout. The AMI venv is just to pre-warm
+the torch wheel into the pip cache so =bootstrap.sh='s ~pip install~ is
+near-instant on launch.
+
+* 7. Launch — on-demand (the recommended path)
+
+*What:* one ~run-instances~ call wiring together everything above plus a
+*user-data* script that runs automatically on first boot. On-demand (not spot)
+is recommended for the real sweep: the whole ~50-run campaign costs only a few
+dollars, with no interruption risk (see =deploy/README.md=).
+
+First, the user-data script the instance runs at boot:
+
+#+begin_src sh
+  cat > user-data.sh <<'EOF'
+  #!/bin/bash
+  set -eux
+
+  # 7a. Use the NVMe instance-store that the DLAMI pre-mounts at /opt/dlami/nvme.
+  #     No formatting needed — it's already an LVM volume on the instance-store
+  #     device (/dev/nvme1n1).  Fall back to a root-EBS directory if absent.
+  DATA_MOUNT=/opt/dlami/nvme
+  if ! mountpoint -q "$DATA_MOUNT"; then
+    echo "WARNING: $DATA_MOUNT not mounted; falling back to /mnt/data on root EBS" >&2
+    DATA_MOUNT=/mnt/data
+    mkdir -p /mnt/data
+  fi
+  chown ubuntu:ubuntu "$DATA_MOUNT"
+
+  sudo apt-get update -y && sudo apt-get install -y python3.12-venv
+
+  # 7b. Get the code and run the bootstrap as the ubuntu user.
+  sudo -u ubuntu -i DATA_MOUNT="$DATA_MOUNT" bash <<'INNER'
+  cd /home/ubuntu
+
+  # Fetch the read-only deploy key from SSM (granted by the instance role) and
+  # install it for SSH so we can clone the PRIVATE repo. No secret is baked in;
+  # the key only ever exists in encrypted SSM and on this ephemeral disk.
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  aws ssm get-parameter --region us-east-2 --name /ldm/deploy-key \
+    --with-decryption --query 'Parameter.Value' --output text > ~/.ssh/id_ed25519
+  chmod 600 ~/.ssh/id_ed25519
+  ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+  git clone --branch refactor git@github.com:cmhyett/LDM.git 2>/dev/null || (cd LDM && git fetch origin refactor && git checkout refactor && git pull)
+  cd /home/ubuntu/LDM
+  export S3_OUT=s3://ua-hpc-archive/groups-data/lagrangian-vgt-outputs/
+  export DATA_DIR="$DATA_MOUNT/lagrangian-vgt"
+  # Per-run hyperparameters go here; runner.py namespaces by config automatically.
+  nohup ./deploy/bootstrap.sh -nu 80 -me 200 -se 10 \
+    > /home/ubuntu/train.log 2>&1 &
+  INNER
+  EOF
+#+end_src
+
+#+RESULTS:
+
+Then launch:
+
+#+begin_src sh
+aws ec2 run-instances --region us-east-2 \
+  --image-id ami-0627ef05d1d2bf3db \
+  --instance-type g4dn.2xlarge \
+  --key-name ldm-key \
+  --security-groups ldm-sg \
+  --iam-instance-profile Name=ldm-training-profile \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1",
+      "Ebs":{"VolumeSize":60,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+  --instance-initiated-shutdown-behavior terminate \
+  --user-data file://user-data.sh \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ldm-training}]'
+# → note the InstanceId in the output as <INSTANCE_ID>.
+#+end_src
+
+#+RESULTS:
+| {                                   |                                                                    |
+| "ReservationId":                    | "r-046fb0486c3cef8a3",                                             |
+| "OwnerId":                          | "333519902021",                                                    |
+| "Groups":                           | [],                                                                |
+| "Instances":                        | [                                                                  |
+| {                                   |                                                                    |
+| "Architecture":                     | "x86_64",                                                          |
+| "BlockDeviceMappings":              | [],                                                                |
+| "ClientToken":                      | "96539d0c-6632-4f40-9438-420d4ee3a5f8",                            |
+| "EbsOptimized":                     | false,                                                             |
+| "EnaSupport":                       | true,                                                              |
+| "Hypervisor":                       | "xen",                                                             |
+| "IamInstanceProfile":               | {                                                                  |
+| "Arn":                              | "arn:aws:iam::333519902021:instance-profile/ldm-training-profile", |
+| "Id":                               | AIPAU3J2V2VC36OI5AKWD                                              |
+| },                                  |                                                                    |
+| "NetworkInterfaces":                | [                                                                  |
+| {                                   |                                                                    |
+| "Attachment":                       | {                                                                  |
+| "AttachTime":                       | "2026-05-31T21:05:30+00:00",                                       |
+| "AttachmentId":                     | "eni-attach-0ffe2d817b06e5939",                                    |
+| "DeleteOnTermination":              | true,                                                              |
+| "DeviceIndex":                      | 0,                                                                 |
+| "Status":                           | "attaching",                                                       |
+| "NetworkCardIndex":                 | 0                                                                  |
+| },                                  |                                                                    |
+| "Description":                      | "",                                                                |
+| "Groups":                           | [                                                                  |
+| {                                   |                                                                    |
+| "GroupId":                          | "sg-0541d4991f20504a9",                                            |
+| "GroupName":                        | ldm-sg                                                             |
+| }                                   |                                                                    |
+| ],                                  |                                                                    |
+| "Ipv6Addresses":                    | [],                                                                |
+| "MacAddress":                       | "0a:5f:ba:4f:e1:51",                                               |
+| "NetworkInterfaceId":               | "eni-01649a028ce679f76",                                           |
+| "OwnerId":                          | "333519902021",                                                    |
+| "PrivateDnsName":                   | "ip-172-31-41-142.us-east-2.compute.internal",                     |
+| "PrivateIpAddress":                 | "172.31.41.142",                                                   |
+| "PrivateIpAddresses":               | [                                                                  |
+| {                                   |                                                                    |
+| "Primary":                          | true,                                                              |
+| "PrivateDnsName":                   | "ip-172-31-41-142.us-east-2.compute.internal",                     |
+| "PrivateIpAddress":                 | 172.31.41.142                                                      |
+| }                                   |                                                                    |
+| ],                                  |                                                                    |
+| "SourceDestCheck":                  | true,                                                              |
+| "Status":                           | "in-use",                                                          |
+| "SubnetId":                         | "subnet-0d5c2cff6b183de91",                                        |
+| "VpcId":                            | "vpc-07ba51ec4a91fd225",                                           |
+| "InterfaceType":                    | "interface",                                                       |
+| "Operator":                         | {                                                                  |
+| "Managed":                          | false                                                              |
+| }                                   |                                                                    |
+| }                                   |                                                                    |
+| ],                                  |                                                                    |
+| "RootDeviceName":                   | "/dev/sda1",                                                       |
+| "RootDeviceType":                   | "ebs",                                                             |
+| "SecurityGroups":                   | [                                                                  |
+| {                                   |                                                                    |
+| "GroupId":                          | "sg-0541d4991f20504a9",                                            |
+| "GroupName":                        | ldm-sg                                                             |
+| }                                   |                                                                    |
+| ],                                  |                                                                    |
+| "SourceDestCheck":                  | true,                                                              |
+| "StateReason":                      | {                                                                  |
+| "Code":                             | "pending",                                                         |
+| "Message":                          | pending                                                            |
+| },                                  |                                                                    |
+| "Tags":                             | [                                                                  |
+| {                                   |                                                                    |
+| "Key":                              | "Name",                                                            |
+| "Value":                            | ldm-training                                                       |
+| }                                   |                                                                    |
+| ],                                  |                                                                    |
+| "VirtualizationType":               | "hvm",                                                             |
+| "CpuOptions":                       | {                                                                  |
+| "CoreCount":                        | 4,                                                                 |
+| "ThreadsPerCore":                   | 2                                                                  |
+| },                                  |                                                                    |
+| "CapacityReservationSpecification": | {                                                                  |
+| "CapacityReservationPreference":    | open                                                               |
+| },                                  |                                                                    |
+| "MetadataOptions":                  | {                                                                  |
+| "State":                            | "pending",                                                         |
+| "HttpTokens":                       | "required",                                                        |
+| "HttpPutResponseHopLimit":          | 2,                                                                 |
+| "HttpEndpoint":                     | "enabled",                                                         |
+| "HttpProtocolIpv6":                 | "disabled",                                                        |
+| "InstanceMetadataTags":             | disabled                                                           |
+| },                                  |                                                                    |
+| "EnclaveOptions":                   | {                                                                  |
+| "Enabled":                          | false                                                              |
+| },                                  |                                                                    |
+| "BootMode":                         | "uefi-preferred",                                                  |
+| "PrivateDnsNameOptions":            | {                                                                  |
+| "HostnameType":                     | "ip-name",                                                         |
+| "EnableResourceNameDnsARecord":     | false,                                                             |
+| "EnableResourceNameDnsAAAARecord":  | false                                                              |
+| },                                  |                                                                    |
+| "MaintenanceOptions":               | {                                                                  |
+| "AutoRecovery":                     | "default",                                                         |
+| "RebootMigration":                  | default                                                            |
+| },                                  |                                                                    |
+| "CurrentInstanceBootMode":          | "uefi",                                                            |
+| "Operator":                         | {                                                                  |
+| "Managed":                          | false                                                              |
+| },                                  |                                                                    |
+| "InstanceId":                       | "i-0ca8fead854504b58",                                             |
+| "ImageId":                          | "ami-0627ef05d1d2bf3db",                                           |
+| "State":                            | {                                                                  |
+| "Code":                             | 0,                                                                 |
+| "Name":                             | pending                                                            |
+| },                                  |                                                                    |
+| "PrivateDnsName":                   | "ip-172-31-41-142.us-east-2.compute.internal",                     |
+| "PublicDnsName":                    | "",                                                                |
+| "StateTransitionReason":            | "",                                                                |
+| "KeyName":                          | "ldm-key",                                                         |
+| "AmiLaunchIndex":                   | 0,                                                                 |
+| "ProductCodes":                     | [],                                                                |
+| "InstanceType":                     | "g4dn.2xlarge",                                                    |
+| "LaunchTime":                       | "2026-05-31T21:05:30+00:00",                                       |
+| "Placement":                        | {                                                                  |
+| "AvailabilityZoneId":               | "use2-az3",                                                        |
+| "GroupName":                        | "",                                                                |
+| "Tenancy":                          | "default",                                                         |
+| "AvailabilityZone":                 | us-east-2c                                                         |
+| },                                  |                                                                    |
+| "Monitoring":                       | {                                                                  |
+| "State":                            | disabled                                                           |
+| },                                  |                                                                    |
+| "SubnetId":                         | "subnet-0d5c2cff6b183de91",                                        |
+| "VpcId":                            | "vpc-07ba51ec4a91fd225",                                           |
+| "PrivateIpAddress":                 | 172.31.41.142                                                      |
+| }                                   |                                                                    |
+| ]                                   |                                                                    |
+| }                                   |                                                                    |
+
+Notes:
+- The g4dn NVMe instance-store is auto-attached on Nitro instances — you mount
+  it (7a) but don't declare it in block-device-mappings.
+- ~DeleteOnTermination:true~ on the root volume means terminating the instance
+  removes its disk, so you pay **no** lingering EBS storage.
+
+#+begin_src sh
+ aws service-quotas get-service-quota --region us-east-2 \
+    --service-code ec2 --quota-code L-DB2E81BA --query
+  'Quota.Value'
+  
+  # Request the increase (vCPUs; 8 = one g4dn.2xlarge):
+  aws service-quotas request-service-quota-increase --region
+  us-east-2 \
+    --service-code ec2 --quota-code L-DB2E81BA --desired-value 8
+   
+  # Track the request:
+  aws service-quotas
+  list-requested-service-quota-change-history-by-quota \
+    --region us-east-2 --service-code ec2 --quota-code L-DB2E81BA \
+    --query 'RequestedQuotas[0].Status'
+
+  If you go the spot route, that's a separate quota — request it
+  too:
+  # "All G and VT Spot Instance Requests"
+  aws service-quotas request-service-quota-increase --region
+  us-east-2 \
+    --service-code ec2 --quota-code L-3819A6DF --desired-value 8
+#+end_src
+
+* 8. Launch — spot (the asynchronous-computing learning path)
+
+Spot is ~3× cheaper but can be reclaimed with a 2-minute notice. The savings are
+small at this scale; the reason to do it here is to *understand the async
+mechanics*. The plumbing already exists in =deploy/bootstrap.sh= (sync-down at
+boot, background sync-up loop, IMDSv2 interruption watcher, EXIT-trap flush).
+
+Add the spot option to the *same* ~run-instances~ call from §7:
+
+#+begin_src sh
+  --instance-market-options \
+    '{"MarketType":"spot",
+      "SpotOptions":{"SpotInstanceType":"one-time",
+                     "InstanceInterruptionBehavior":"terminate"}}'
+#+end_src
+
+How a reclaim plays out:
+1. AWS flips the IMDS endpoint ~/latest/meta-data/spot/instance-action~ to a
+   terminate notice (~2 min out). The watcher in =bootstrap.sh= sees it and does
+   a final ~aws s3 sync~, so the latest checkpoint reaches S3.
+2. The instance is terminated; its root volume is deleted. The S3 copy survives.
+3. *Nothing restarts automatically* with a ~one-time~ request — you (or an Auto
+   Scaling Group) relaunch. The relaunched instance runs the **same user-data**,
+   which syncs the outputs prefix *down*, and ~runner.py --resume~ finds this
+   config's =checkpoint_resume.pt= and continues from the saved epoch.
+
+For *automatic* replacement, create the launch config as a **launch template**
+and put it behind an EC2 Auto Scaling Group with desired capacity 1 — the ASG
+relaunches a replacement (possibly in another AZ, which is exactly why the
+resume checkpoint lives in region-wide S3, not an AZ-pinned EBS volume). That is
+the self-healing async pattern; the per-instance half is already done.
+
+* 9. Monitor and retrieve results
+
+#+begin_src sh
+# Find the public IP once the instance is running:
+aws ec2 describe-instances --region us-east-2 --instance-ids i-0ca8fead854504b58 \
+  --query 'Reservations[].Instances[].PublicIpAddress' --output text
+#+end_src
+
+#+RESULTS:
+: 18.226.73.124
+
+#+begin_src sh
+  # SSH in and watch progress:
+  ssh -i ldm-key.pem ubuntu@18.226.73.124
+  tail -f /home/ubuntu/train.log     # training output
+  nvidia-smi                          # GPU utilization
+  #+end_src
+
+  #+begin_src sh
+  # Pull results down anytime (outputs are namespaced by config slug):
+  aws s3 sync s3://ua-hpc-archive/groups-data/lagrangian-vgt-outputs/ ./outputs
+  # e.g. ./outputs/nu80_nl3_nf16_lr0.3_dr0_hl50_ht1_pt0.2/{ph,vis}/{checkpoint_*.pt,*.csv,config.json}
+#+end_src
+
+* 10. Teardown and cost hygiene
+
+**The instance terminates itself.** When =bootstrap.sh= finishes (or training
+crashes), its EXIT trap flushes the final artifacts to S3 and then runs
+~sudo shutdown -h now~; because the launch sets
+~--instance-initiated-shutdown-behavior terminate~, halting the OS tears the
+instance down, and ~DeleteOnTermination:true~ deletes the root volume with it.
+So there is normally nothing to clean up manually.
+
+The commands below are a **safety check** — run them if a launch failed before
+=bootstrap.sh= took over (e.g. a bad AMI id or user-data error), which would
+leave an instance idling:
+
+#+begin_src sh
+# Any still-running training instances?
+aws ec2 describe-instances --region us-east-2 \
+  --filters "Name=tag:Name,Values=ldm-training" "Name=instance-state-name,Values=running,stopped" \
+  --query 'Reservations[].Instances[].InstanceId' --output text
+# Terminate stragglers if the self-shutdown didn't fire:
+# aws ec2 terminate-instances --region us-east-2 --instance-ids <INSTANCE_ID>
+
+# Any orphaned volumes? (the root volume should already be gone)
+aws ec2 describe-volumes --region us-east-2 \
+  --filters Name=status,Values=available \
+  --query 'Volumes[].VolumeId' --output text
+# delete any leftovers: aws ec2 delete-volume --region us-east-2 --volume-id <VOL_ID>
+
+# When the whole campaign is over, remove the temporary outputs if you don't
+# need them in the cloud (they're also on your laptop after step 9):
+# aws s3 rm s3://ua-hpc-archive/groups-data/lagrangian-vgt-outputs/ --recursive
+#+end_src
+
+* 11. Cheat-sheet (the full happy path)
+
+Assumes §2–6 done once. Per training job:
+
+#+begin_src sh
+AMI=$(aws ec2 describe-images --region us-east-2 --owners amazon \
+  --filters "Name=name,Values=Deep Learning OSS Nvidia Driver AMI GPU PyTorch*Ubuntu*" \
+            "Name=state,Values=available" \
+  --query 'reverse(sort_by(Images,&CreationDate))[0].ImageId' --output text)
+
+# (edit the -nu/-me/... flags in user-data.sh for this run, then:)
+aws ec2 run-instances --region us-east-2 --image-id "$AMI" \
+  --instance-type g4dn.2xlarge --key-name ldm-key --security-groups ldm-sg \
+  --iam-instance-profile Name=ldm-training-profile \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":60,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+  --instance-initiated-shutdown-behavior terminate \
+  --user-data file://user-data.sh \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ldm-training}]' \
+  --query 'Instances[0].InstanceId' --output text   # → <INSTANCE_ID>
+
+# ... watch (§9) ... then:
+aws s3 sync s3://ua-hpc-archive/groups-data/lagrangian-vgt-outputs/ ./outputs
+aws ec2 terminate-instances --region us-east-2 --instance-ids <INSTANCE_ID>
+#+end_src
+
+For a sweep, repeat the launch with different hyperparameter flags in
+=user-data.sh= (e.g. ~-nu 40~, ~-nu 80~, ~-lr 0.1~); each lands in its own
+~outputs/<config-slug>/~ prefix and never clobbers another.
