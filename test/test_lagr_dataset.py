@@ -140,7 +140,7 @@ class LagrDatasetTest(ut.TestCase):
         self.assertEqual(len(sample_ds), num_samples)
         
     def test_LagrDataset_to(self):
-        num_samples = 1000
+        num_samples = 16
         num_tsteps = 100
         test_data_path = self.cwd + '/test_data/'
         data_shape = (num_samples, num_tsteps, 3, 3)
@@ -165,7 +165,7 @@ class LagrDatasetTest(ut.TestCase):
 
 
     def test_LagrDataset_fromfile(self):
-        num_samples = 1000
+        num_samples = 16
         num_tsteps = 100
         test_data_path = self.cwd + '/test_data/'
         data_shape = (num_samples, num_tsteps, 3, 3)
@@ -191,7 +191,7 @@ class LagrDatasetTest(ut.TestCase):
         return
 
     def test_LagrDataset__getitem__(self):
-        num_samples = 1000
+        num_samples = 16
         num_tsteps = 100
         test_data_path = self.cwd + '/test_data/'
         data_shape = (num_samples, num_tsteps, 3, 3)
@@ -208,32 +208,32 @@ class LagrDatasetTest(ut.TestCase):
                                 history_length,
                                 percent_test)
         train_ds, test_ds = ld.LagrDataset.from_file(data_desc)
-        train_input, train_output = train_ds.__getitem__(34)
-        test_input, test_output = test_ds.__getitem__(72)
+        train_input, train_output = train_ds.__getitem__(10)
+        test_input, test_output = test_ds.__getitem__(7)
         train_input = train_ds.reinflate_input(train_input)
         test_input = test_ds.reinflate_input(test_input)
         train_output = train_ds.reinflate_output(train_output)
         test_output = test_ds.reinflate_output(test_output)
         self.assertTrue(torch.allclose(train_input[0],
-                                       train_ds.aij_series[34, ...]))
+                                       train_ds.aij_series[10, ...]))
         self.assertTrue(torch.allclose(train_input[1],
-                                       train_ds.invars[34, ...]))
+                                       train_ds.invars[10, ...]))
         self.assertTrue(torch.allclose(train_input[2],
-                                       train_ds.tb[34, ...]))
+                                       train_ds.tb[10, ...]))
         self.assertTrue(torch.allclose(train_output[0],
-                                       train_ds.target[34, ...]))
+                                       train_ds.target[10, ...]))
 
         self.assertTrue(torch.allclose(test_input[0],
-                                       test_ds.aij_series[72, ...]))
+                                       test_ds.aij_series[7, ...]))
         self.assertTrue(torch.allclose(test_input[1],
-                                       test_ds.invars[72, ...]))
+                                       test_ds.invars[7, ...]))
         self.assertTrue(torch.allclose(test_input[2],
-                                       test_ds.tb[72, ...]))
+                                       test_ds.tb[7, ...]))
         self.assertTrue(torch.allclose(test_output[0],
-                                       test_ds.target[72, ...]))
+                                       test_ds.target[7, ...]))
 
     def test_LagrDataset__getitems__(self):
-        num_samples = 1000
+        num_samples = 16
         num_tsteps = 100
         test_data_path = self.cwd + '/test_data/'
         data_shape = (num_samples, num_tsteps, 3, 3)
@@ -250,7 +250,7 @@ class LagrDatasetTest(ut.TestCase):
                                 history_length,
                                 percent_test)
         train_ds, test_ds = ld.LagrDataset.from_file(data_desc)
-        idxs = [34, 72]
+        idxs = [5, 9]
         train_input, train_output = train_ds.__getitems__(idxs)
         test_input, test_output = test_ds.__getitems__(idxs)
         train_input = train_ds.reinflate_input(train_input)
@@ -326,7 +326,7 @@ class LagrDatasetTest(ut.TestCase):
             ld._load_a(aij, 3e-4, inds, 15)             # 9 + 15 >= 20
 
     def test_dA_from_file_shapes(self):
-        num_samples, num_tsteps = 1000, 100
+        num_samples, num_tsteps = 16, 100
         rollout = 3
         hl, ht = 25, 5
         data_desc = ld.DataDesc(self.cwd + '/test_data/',

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test suite (CPU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # CPU build of torch (matches the pinned 2.5.1); avoids pulling the
+          # large CUDA wheels, which are useless on a GPU-less runner.
+          pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r python_config/requirements.txt
+          # tensorboard is imported by src/training_utils.py but lives in
+          # requirements-aws.txt (which would otherwise downgrade numpy), so
+          # install just it here alongside the test runner.
+          pip install tensorboard==2.20.0 pytest
+
+      - name: Run tests
+        # PYTHONPATH=src lets the test modules import the source as flat modules
+        # (import utils, latn, ...), matching the documented invocation in the
+        # README. GPU/DDP tests self-skip on a CPU runner.
+        run: PYTHONPATH=src python -m pytest test/ -v
