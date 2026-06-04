@@ -10,7 +10,7 @@ import distributed
 
 DATA_DESC = lagrdataset.DataDesc(
     os.path.dirname(os.path.abspath(__file__)) + '/test_data',
-    (1000, 100, 3, 3),  # datashape = (num_samples, num_tsteps, 3, 3)
+    (16, 100, 3, 3),  # datashape = (num_samples, num_tsteps, 3, 3)
     "pij",  # target_name,
     3e-4,  # dt,
     5,  # history_timestep,

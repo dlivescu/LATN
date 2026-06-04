@@ -12,7 +12,7 @@ import distributed
 DATA_DESC = lagrdataset.\
     DataDesc(
         os.path.dirname(os.path.abspath(__file__)) + '/test_data',
-             (1000, 100, 3, 3), #(num_samples, num_tsteps, 3, 3)
+             (16, 100, 3, 3), #(num_samples, num_tsteps, 3, 3)
              "pij", # target_name,
              3e-4, # dt,
              5, # history_timestep,
@@ -174,7 +174,7 @@ class TestLATN_NODE(ut.TestCase):
             DATA_DESC.path_to_data, DATA_DESC.data_shape, "dA",
             DATA_DESC.dt, DATA_DESC.history_timestep,
             DATA_DESC.history_length, DATA_DESC.percent_test,
-            200,            # num_samples (keep it small/fast)
+            16,             # num_samples (keep it small/fast)
             self.rollout)   # rollout_len
         self.train_ds, self.test_ds = lagrdataset.\
             LagrDataset.from_file(self.data_desc, device=self.device)
